@@ -20,6 +20,11 @@ RegisterNetEvent('QBCore:Client:OnPlayerUnload', function()
     TriggerServerEvent("mri_Qstashes:server:Unload")
 end)
 
+RegisterNetEvent('mri_Qadmin:client:ForceReloadPermissions', function()
+    updateAdminStatus()
+end)
+
+
 RegisterNetEvent("mri_Qstashes:openAdm", function(searchTerm)
     if not isAdminCache then
         lib.notify({ type = 'error', description = locale("error.admin_only") })
@@ -213,7 +218,9 @@ RegisterNetEvent('mri_Qstashes:start', function(stashesTable)
         if v.item == nil or "" then
             v.item = 1
         end
-        if v.cid == nil or "" then
+        if v.citizenID and v.citizenID ~= "" then
+            v.cid = v.citizenID
+        else
             v.cid = 2
         end
         if v.rank then

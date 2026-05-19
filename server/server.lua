@@ -2,11 +2,49 @@ local stashesTable = {}
 
 function isAdmin(src)
     if not Config or not Config.AdminPerms then return false end
+    
+    -- 1. Check custom permissions and basic ACE groups
     for _, perm in ipairs(Config.AdminPerms) do
-        if IsPlayerAceAllowed(src, perm) then
+        if IsPlayerAceAllowed(src, perm) or IsPlayerAceAllowed(src, "group." .. perm) then
             return true
         end
     end
+    
+    -- 2. Check standard FiveM admin ACEs (e.g. command)
+    if IsPlayerAceAllowed(src, "command") then
+        return true
+    end
+
+    -- 3. Check permission to execute the bau command itself (granted by ox_lib command registration)
+    if IsPlayerAceAllowed(src, "command." .. (Config.Command or "bau")) then
+        return true
+    end
+
+    -- 4. Check Qbox metadata if qbx_core export is available
+    local qbxCore = GetResourceState('qbx_core') == 'started' and exports.qbx_core
+    if qbxCore then
+        local player = qbxCore:GetPlayer(src)
+        if player and player.PlayerData and player.PlayerData.metadata then
+            local staffRole = player.PlayerData.metadata['staff']
+            if staffRole then
+                local role = staffRole:gsub('group%.', '')
+                for _, perm in ipairs(Config.AdminPerms) do
+                    if role == perm then
+                        return true
+                    end
+                end
+            end
+        end
+    end
+
+    -- 5. Check mri_Qadmin permissions if started
+    if GetResourceState('mri_Qadmin') == 'started' then
+        local hasPerm = exports['mri_Qadmin']:HasPerms(src, 'qadmin.open') or exports['mri_Qadmin']:HasPerms(src, 'qadmin.master')
+        if hasPerm then
+            return true
+        end
+    end
+
     return false
 end
 
@@ -159,10 +197,13 @@ end)
 
 lib.addCommand(Config.Command, {
     help = locale("command.help"),
-    restricted = 'group.admin'
 }, function(source, args, raw)
     local src = source
-    TriggerClientEvent('mri_Qstashes:openAdm', src)
+    if isAdmin(src) then
+        TriggerClientEvent('mri_Qstashes:openAdm', src)
+    else
+        TriggerClientEvent('ox_lib:notify', src, { type = 'error', description = locale("error.admin_only") })
+    end
 end)
 
 local function sendWebhook(webhook, data)
